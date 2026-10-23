@@ -1,18 +1,11 @@
 import { useState } from 'react';
-import { DEFAULT_CONFIG, LIMITS, PRESETS, toCentimeters, toDisplay } from '../config.js';
-import { ColorControl, Icon, NumericInput, RangeControl, Switch } from './Controls.jsx';
+import { DEFAULT_CONFIG } from '../config.js';
+import { ColorControl, RangeControl, Switch } from './Controls.jsx';
+import ModuleEditor from './ModuleEditor.jsx';
 
 function ProductPanel({ config: c, change }) {
-  const preset = PRESETS.find(p => ['length', 'width', 'thickness', 'count'].every(key => Math.abs(p[key] - c[key]) < 0.0001));
   return <>
-    <label className="field-label" htmlFor="sku-preset">预设尺寸</label>
-    <select id="sku-preset" value={preset?.id || 'custom'} onChange={event => { const p = PRESETS.find(p => p.id === event.target.value); if (p) change(p); }}>
-      <option value="custom">自定义尺寸</option>{PRESETS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-    </select>
-    <div className="unit-row"><span>单位</span><div className="segmented" aria-label="尺寸单位">{['in', 'cm'].map(unit => <button key={unit} aria-pressed={c.unit === unit} onClick={() => change({ unit })}>{unit}</button>)}</div></div>
-    <div className="dimensions">{[['length', '长度'], ['width', '宽度'], ['thickness', '单片厚度']].map(([key, label]) => <div className="number-row" key={key}><span>{label}</span><div className="number-with-unit"><NumericInput value={toDisplay(c[key], c.unit)} onChange={value => change({ [key]: toCentimeters(value, c.unit) })} min={toDisplay(LIMITS[key][0], c.unit)} max={toDisplay(LIMITS[key][1], c.unit)} step={0.1} label={label} /><span>{c.unit}</span></div></div>)}</div>
-    <div className="number-row"><span>片数</span><div className="stepper"><button aria-label="减少片数" disabled={c.count <= 1} onClick={() => change({ count: c.count - 1 })}><Icon name="minus" /></button><NumericInput value={c.count} onChange={count => change({ count })} label="片数" min={1} max={12} /><button aria-label="增加片数" disabled={c.count >= 12} onClick={() => change({ count: c.count + 1 })}><Icon name="plus" /></button></div></div>
-    <p className="hint align-right">多片完全对齐、贴合堆叠</p>
+    <ModuleEditor modules={c.modules} change={change} />
     <hr />
     <RangeControl label="圆角半径" value={c.radius} onChange={radius => change({ radius })} min={0} max={20} step={0.1} unit="mm" hint="薄片的圆角会自动限制在厚度允许的范围内。" />
     <RangeControl label="细孔强度" value={c.poreStrength} onChange={poreStrength => change({ poreStrength })} min={0} max={2} />
@@ -25,7 +18,7 @@ function ProductPanel({ config: c, change }) {
 function CameraPanel({ config: c, change }) {
   return <>
     <h2>透视镜头</h2><p className="panel-description">低角度展示厚度，保留自然透视。</p>
-    <div className="view-presets"><button onClick={() => change({ azimuth: 31, elevation: 22 })}>前右视角</button><button onClick={() => change({ azimuth: -31, elevation: 22 })}>前左视角</button><button onClick={() => change({ azimuth: 0, elevation: 12 })}>接近正面</button><button onClick={() => change({ azimuth: 31, elevation: 45 })}>俯看细节</button></div>
+    <div className="view-presets"><button onClick={() => change({ azimuth: 31, elevation: DEFAULT_CONFIG.elevation })}>前右视角</button><button onClick={() => change({ azimuth: -31, elevation: DEFAULT_CONFIG.elevation })}>前左视角</button><button onClick={() => change({ azimuth: 0, elevation: 12 })}>接近正面</button><button onClick={() => change({ azimuth: 31, elevation: 45 })}>俯看细节</button></div>
     <hr />
     <RangeControl label="仰角" value={c.elevation} onChange={elevation => change({ elevation })} min={5} max={85} step={1} unit="°" />
     <RangeControl label="方位角" value={c.azimuth} onChange={azimuth => change({ azimuth })} min={-180} max={180} step={1} unit="°" />

@@ -46,6 +46,30 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 25px 0; }
 .stepper input::-webkit-inner-spin-button { appearance: none; }
 .hint { color: var(--muted); font-size: 11px; line-height: 1.65; margin-top: 9px; }
 .align-right { text-align: right; }
+.stack-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.stack-heading > span { color: #788780; font-size: 11px; white-space: nowrap; }
+.stack-description { color: #7e8a84; font-size: 11px; line-height: 1.8; margin: 10px 0 17px; }
+.module-list { display: grid; gap: 14px; }
+.module-card { border: 1px solid var(--line); border-radius: 9px; padding: 13px; background: #fff; }
+.module-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 8px; }
+.module-title { display: flex; align-items: center; gap: 7px; }
+.module-title h3 { margin: 0; font-size: 13px; font-weight: 650; white-space: nowrap; }
+.module-title > span { color: var(--accent); background: #eff6f2; padding: 3px 5px; border-radius: 4px; font-size: 10px; white-space: nowrap; }
+.module-actions { display: flex; gap: 3px; }
+.module-actions button { width: 25px; height: 27px; padding: 0; border-color: transparent; background: #f7f9f8; }
+.module-actions .remove-module:hover:not(:disabled) { color: #a64d3f; background: #fff3f0; border-color: #efd0c9; }
+.module-card .field-label, .module-card .number-row, .module-card .unit-row { font-size: 12px; }
+.module-card select { font-size: 12px; padding-left: 9px; }
+.module-card .unit-row { margin: 20px 0; }
+.module-card .dimensions { gap: 15px; margin-bottom: 15px; }
+.module-card .number-row { gap: 8px; }
+.module-card .number-row > span { white-space: nowrap; }
+.module-card .number-with-unit, .module-card .stepper, .module-card .segmented { width: 135px; flex-shrink: 0; }
+.module-card .number-with-unit { gap: 8px; }
+.module-card .number-with-unit input { width: 105px; }
+.module-card .stepper button { padding: 0 9px; }
+.add-module { width: 100%; margin-top: 14px; color: var(--accent); background: #f5f9f6; border: 1px dashed #9bb8a9; }
+.stack-summary { font-size: 11px; color: #7e8a84; text-align: center; margin-top: 12px; }
 .range-control { margin: 24px 0; }
 .control-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; font-size: 14px; }
 .range-value { display: flex; align-items: center; font-size: 12px; gap: 2px; color: #56625f; }

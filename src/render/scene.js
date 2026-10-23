@@ -1,15 +1,11 @@
 import * as THREE from 'three';
-import { createFoamGeometry, pieceCenters } from './geometry.js';
+import { createFoamGeometry, stackPieces } from './geometry.js';
 import { cameraFor } from './camera.js';
 
-export function createScene(config, textures, width, height) {
-  const { length, thickness, width: depth, count } = config;
-  const scene = new THREE.Scene();
-  scene.background = config.transparent ? null : new THREE.Color(config.background);
-  const group = new THREE.Group();
-  scene.add(group);
+function createFoamMaterial(config, module, textures) {
+  const { length, thickness, width: depth } = module;
   const material = new THREE.MeshStandardMaterial({
-    color: config.foamColor, map: textures.map, normalMap: textures.normalMap,
+    color: config.foamColor, map: textures.map ?? null, normalMap: textures.normalMap ?? null,
     normalScale: new THREE.Vector2(config.poreStrength, config.poreStrength), roughness: config.roughness, metalness: 0,
   });
   material.onBeforeCompile = shader => {
@@ -25,8 +21,20 @@ export function createScene(config, textures, width, height) {
       diffuseColor.rgb*=1.0-uEdgeShade*upperFace*edgeBand;`);
   };
   material.customProgramCacheKey = () => 'foam-soft-edge-v1';
-  const geometry = createFoamGeometry(length, thickness, depth, config.radius, config.poreScale);
-  for (const center of pieceCenters(thickness, count)) {
+  return material;
+}
+
+export function createScene(config, textures, width, height) {
+  const scene = new THREE.Scene();
+  scene.background = config.transparent ? null : new THREE.Color(config.background);
+  const group = new THREE.Group();
+  scene.add(group);
+  const resources = config.modules.map(module => ({
+    geometry: createFoamGeometry(module.length, module.thickness, module.width, config.radius, config.poreScale),
+    material: createFoamMaterial(config, module, textures),
+  }));
+  for (const { moduleIndex, center } of stackPieces(config.modules)) {
+    const { geometry, material } = resources[moduleIndex];
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.fromArray(center);
     mesh.castShadow = mesh.receiveShadow = true;
@@ -34,7 +42,8 @@ export function createScene(config, textures, width, height) {
   }
   const bounds = new THREE.Box3().setFromObject(group);
   const center = bounds.getCenter(new THREE.Vector3());
-  const extent = Math.max(length, depth, thickness * count);
+  const size = bounds.getSize(new THREE.Vector3());
+  const extent = Math.max(size.x, size.y, size.z);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(extent * 20, extent * 20), new THREE.ShadowMaterial({ color: '#555555', opacity: config.shadowOpacity }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.012;
@@ -62,7 +71,8 @@ export function createScene(config, textures, width, height) {
   return {
     scene, key, extent, camera: cameraFor(bounds, config, width, height),
     dispose() {
-      geometry.dispose(); material.dispose(); ground.geometry.dispose(); ground.material.dispose();
+      resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); });
+      ground.geometry.dispose(); ground.material.dispose();
       key.shadow.map?.dispose(); key.shadow.mapPass?.dispose();
     },
   };

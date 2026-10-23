@@ -17,7 +17,7 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState(null);
   const preview = useRef(null), fileInput = useRef(null), controller = useRef(null);
-  const change = useCallback(patch => setConfig(previous => normalizeConfig({ ...previous, ...patch })), []);
+  const change = useCallback(patch => setConfig(previous => normalizeConfig({ ...previous, ...(typeof patch === 'function' ? patch(previous) : patch) })), []);
   const reportError = useCallback(text => setMessage({ text, error: true }), []);
   useEffect(() => {
     const timer = setTimeout(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch { setMessage({ text: '浏览器禁止自动保存，可以使用“保存参数”下载配置。', error: true }); } }, 250);

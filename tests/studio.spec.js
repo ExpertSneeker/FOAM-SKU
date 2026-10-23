@@ -30,7 +30,7 @@ test('studio renders a low-angle aligned stack and exports real alpha at custom 
   await expect(page.getByRole('button', { name: '导出 PNG', exact: true })).toBeEnabled();
   await expect(page.getByTestId('preview')).toHaveAttribute('data-status', 'ready');
   await page.getByRole('tab', { name: '视角', exact: true }).click();
-  await expect(page.getByLabel('仰角数值')).toHaveValue('22');
+  await expect(page.getByLabel('仰角数值')).toHaveValue('11');
   await page.getByRole('tab', { name: '场景', exact: true }).click();
   await page.getByRole('switch', { name: '透明背景', exact: true }).check();
   await page.getByRole('switch', { name: '地面阴影', exact: true }).uncheck();
@@ -109,12 +109,12 @@ test('unit switching, JSON round trip, invalid file feedback and persistence', a
   const savedEvent = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存参数' }).click();
   const saved = JSON.parse(await fs.readFile(await (await savedEvent).path(), 'utf8'));
-  expect(saved.length).toBe(80); expect(saved.count).toBe(3);
+  expect(saved.modules[0].length).toBe(80); expect(saved.modules[0].count).toBe(3);
   await page.getByRole('button', { name: '恢复默认' }).click();
   await page.getByLabel('导入参数文件').setInputFiles({ name: 'config.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(saved)) });
   await expect(page.getByLabel('长度', { exact: true })).toHaveValue('80');
   await expect(page.getByLabel('片数', { exact: true })).toHaveValue('3');
-  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foam-sku:config:v1'))?.length === 80);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foam-sku:config:v2'))?.modules[0].length === 80);
   await page.reload();
   await expect(page.getByLabel('长度', { exact: true })).toHaveValue('80');
   await page.getByLabel('导入参数文件').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{"version":99}') });
@@ -128,9 +128,9 @@ test('camera interaction and cancellation recover to a usable preview', async ({
   const canvas = page.getByTestId('preview');
   await canvas.focus(); await page.keyboard.press('ArrowUp');
   await page.getByRole('tab', { name: '视角', exact: true }).click();
-  await expect(page.getByLabel('仰角数值')).toHaveValue('25');
+  await expect(page.getByLabel('仰角数值')).toHaveValue('14');
   await page.getByRole('button', { name: '复位视角', exact: true }).click();
-  await expect(page.getByLabel('仰角数值')).toHaveValue('22');
+  await expect(page.getByLabel('仰角数值')).toHaveValue('11');
   await page.getByLabel('渲染质量').selectOption('64');
   await expect(canvas).toHaveAttribute('data-status', 'ready');
   await page.getByRole('button', { name: '导出 PNG', exact: true }).click();
@@ -160,4 +160,39 @@ test('4096 px export completes with real product pixels', async ({ page }) => {
   expect(metadata.width).toBe(4096); expect(metadata.height).toBe(4096);
   const center = await sharp(path).extract({ left: 2048, top: 2048, width: 1, height: 1 }).ensureAlpha().raw().toBuffer();
   expect(center[3]).toBe(255); expect(center[0]).toBeGreaterThan(160);
+});
+
+test('modules can have independent sizes, reorder, persist, export and be removed', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('preview')).toHaveAttribute('data-status', 'ready');
+  const first = page.getByRole('group', { name: '海绵模块 1', exact: true });
+  await expect(first.getByRole('button', { name: '删除模块' })).toBeDisabled();
+  await page.getByRole('button', { name: '添加海绵模块', exact: true }).click();
+  const second = page.getByRole('group', { name: '海绵模块 2', exact: true });
+  await expect(second.getByLabel('片数', { exact: true })).toHaveValue('1');
+  await second.getByRole('button', { name: 'cm', exact: true }).click();
+  for (const [label, value] of [['长度', '40'], ['宽度', '30'], ['单片厚度', '5']]) {
+    await second.getByLabel(label, { exact: true }).fill(value);
+    await second.getByLabel(label, { exact: true }).blur();
+  }
+  await expect(first.getByLabel('长度', { exact: true })).toHaveValue('24');
+  await expect(page.getByTestId('preview')).toHaveAttribute('data-status', 'ready');
+  await second.getByRole('button', { name: '往下放', exact: true }).click();
+  await expect(first.getByLabel('长度', { exact: true })).toHaveValue('40');
+  await expect(second.getByLabel('长度', { exact: true })).toHaveValue('24');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('foam-sku:config:v2'))?.modules[0].length === 40);
+  await page.reload();
+  await expect(first.getByLabel('长度', { exact: true })).toHaveValue('40');
+  await page.getByLabel('导出宽度').fill('768'); await page.getByLabel('导出宽度').blur();
+  await page.getByLabel('导出高度').fill('512'); await page.getByLabel('导出高度').blur();
+  await page.getByLabel('渲染质量').selectOption('16');
+  const path = await downloadImage(page);
+  const metadata = await sharp(path).metadata();
+  expect(metadata.width).toBe(768); expect(metadata.height).toBe(512);
+  await second.getByRole('button', { name: '删除模块' }).click();
+  await expect(page.getByRole('group', { name: /^海绵模块/ })).toHaveCount(1);
+  await page.getByRole('button', { name: '恢复默认', exact: true }).click();
+  await expect(first.getByLabel('长度', { exact: true })).toHaveValue('24');
+  await expect(page.getByLabel('圆角半径数值')).toHaveValue('0.7');
+  await expect(page.getByLabel('细孔强度数值')).toHaveValue('0');
 });

@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Icon } from './Controls.jsx';
+import { DEFAULT_CONFIG } from '../config.js';
 
 function canvasBlob(canvas, format) {
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('图片编码失败，请降低分辨率后重试。')), format === 'jpeg' ? 'image/jpeg' : 'image/png', 0.96));
@@ -79,7 +80,7 @@ const Preview = forwardRef(function Preview({ config, change, busy, onReady, onE
     if (updates[event.key]) { event.preventDefault(); change(updates[event.key]); }
   }
   return <section className="preview-pane">
-    <div className="preview-toolbar"><h1>实时预览</h1><div><button disabled={busy} onClick={() => change({ azimuth: 31, elevation: 22, focalLength: 65 })}><Icon name="reset" />复位视角</button><button disabled={busy} onClick={() => change({ framing: 0.82 })}><Icon name="fit" />适合画布</button></div></div>
+    <div className="preview-toolbar"><h1>实时预览</h1><div><button disabled={busy} onClick={() => change({ azimuth: DEFAULT_CONFIG.azimuth, elevation: DEFAULT_CONFIG.elevation, focalLength: DEFAULT_CONFIG.focalLength })}><Icon name="reset" />复位视角</button><button disabled={busy} onClick={() => change({ framing: DEFAULT_CONFIG.framing })}><Icon name="fit" />适合画布</button></div></div>
     <div className="canvas-area" ref={area}><div className={`scene-frame ${config.transparent ? 'checkerboard' : ''}`} style={{ width: displayWidth, height: displayHeight, backgroundColor: config.transparent ? undefined : config.background }}>
       <canvas ref={canvas} data-testid="preview" data-status={status} aria-label="海绵三维预览，拖动旋转，滚轮缩放" role="img" tabIndex="0" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} onKeyDown={keyboard} onWheel={event => { if (!busy) change({ framing: config.framing - event.deltaY * 0.0004 }); }} />
       {status === 'loading' && <div className="canvas-message"><span className="spinner" />正在准备材质</div>}

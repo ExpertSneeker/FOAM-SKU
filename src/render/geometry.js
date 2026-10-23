@@ -3,6 +3,17 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 
 export const pieceCenters = (thickness, count) => Array.from({ length: count }, (_, i) => [0, thickness / 2 + i * thickness, 0]);
 
+// Modules are listed from the ground upwards. A shared cumulative base keeps
+// adjacent faces touching even when the next module has a different thickness.
+export function stackPieces(modules) {
+  let base = 0;
+  return modules.flatMap((module, moduleIndex) => {
+    const pieces = pieceCenters(module.thickness, module.count).map(center => ({ moduleIndex, center: [0, base + center[1], 0] }));
+    base += module.thickness * module.count;
+    return pieces;
+  });
+}
+
 export function createFoamGeometry(length, thickness, width, radiusMm, poreScale) {
   const radius = Math.min(radiusMm / 10, thickness * 0.2, length * 0.05, width * 0.05);
   const geometry = radius > 0 ? new RoundedBoxGeometry(length, thickness, width, 5, radius) : new BoxGeometry(length, thickness, width).toNonIndexed();
