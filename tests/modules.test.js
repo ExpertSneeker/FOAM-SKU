@@ -49,24 +49,24 @@ test('unequal slabs touch at cumulative heights and remain centered in both axes
   assert.deepEqual(reordered.map(p => p.center[1]), [2.5, 7.5, 12.5, 20, 30]);
 });
 
-test('render scene uses each module dimensions and distinct shader half sizes', () => {
+test('render scene preserves mixed footprints, total heights and distinct shader half sizes', () => {
   const c = config.normalizeConfig({ modules: mixed });
   const result = createScene(c, {}, 1200, 900);
   const meshes = result.scene.children.find(child => child.isGroup).children;
-  assert.equal(meshes.length, 5);
+  assert.equal(meshes.length, 2);
   const boxes = meshes.map(mesh => new Box3().setFromObject(mesh));
   boxes.forEach((box, index) => {
     const size = box.getSize(new Vector3());
-    assert.ok(Math.abs(size.x - (index < 2 ? 80 : 40)) < 1e-4);
-    assert.ok(Math.abs(size.y - (index < 2 ? 10 : 5)) < 1e-4);
+    assert.ok(Math.abs(size.x - (index === 0 ? 80 : 40)) < 1e-4);
+    assert.ok(Math.abs(size.y - (index === 0 ? 20 : 15)) < 1e-4);
     if (index) assert.ok(Math.abs(box.min.y - boxes[index - 1].max.y) < 1e-4);
   });
-  assert.equal(meshes[0].geometry, meshes[1].geometry);
-  assert.notEqual(meshes[0].material, meshes[2].material);
-  for (const index of [0, 2]) {
+  assert.notEqual(meshes[0].geometry, meshes[1].geometry);
+  assert.notEqual(meshes[0].material, meshes[1].material);
+  for (const index of [0, 1]) {
     const shader = { uniforms: {}, vertexShader: '', fragmentShader: '' };
     meshes[index].material.onBeforeCompile(shader);
-    assert.equal(shader.uniforms.uFoamHalfSize.value.y, index === 0 ? 5 : 2.5);
+    assert.equal(shader.uniforms.uFoamHalfSize.value.y, index === 0 ? 10 : 7.5);
   }
   result.dispose();
 });

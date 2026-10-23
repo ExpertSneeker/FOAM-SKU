@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs/promises';
-import { DEFAULT_CONFIG } from '../src/config.js';
+import { DEFAULT_CONFIG, DEFAULT_MODULE, normalizeConfig } from '../src/config.js';
+import { measureSeams } from './helpers/seam-profile.js';
 
 async function applyConfig(page, patch) {
   await page.getByLabel('导入参数文件').setInputFiles({ name: 'foam-sku-config.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...DEFAULT_CONFIG, ...patch })) });
@@ -195,4 +196,25 @@ test('modules can have independent sizes, reorder, persist, export and be remove
   await expect(first.getByLabel('长度', { exact: true })).toHaveValue('24');
   await expect(page.getByLabel('圆角半径数值')).toHaveValue('0.7');
   await expect(page.getByLabel('细孔强度数值')).toHaveValue('0');
+});
+
+test('stack seams stay dark, clear and uniform on both faces at different resolutions', async ({ page }) => {
+  await page.goto('/');
+  for (const size of [1024, 2000]) {
+    const config = normalizeConfig({ modules: [{ ...DEFAULT_MODULE, count: 4 }], exportWidth: size, exportHeight: size, samples: 32 });
+    await applyConfig(page, config);
+    const metrics = await measureSeams(await downloadImage(page), config);
+    for (const line of metrics) {
+      expect(line.darkening).toBeGreaterThan(7);
+      expect(line.darkening).toBeLessThan(22);
+      expect(line.brightening).toBeLessThan(2);
+      expect(line.equivalentWidth).toBeGreaterThan(1);
+      expect(line.equivalentWidth).toBeLessThan(2.5);
+    }
+    for (const face of ['front', 'right']) {
+      const lines = metrics.filter(line => line.face === face);
+      expect(Math.max(...lines.map(line => line.darkening)) - Math.min(...lines.map(line => line.darkening))).toBeLessThan(2);
+      expect(Math.max(...lines.map(line => line.equivalentWidth)) - Math.min(...lines.map(line => line.equivalentWidth))).toBeLessThan(0.35);
+    }
+  }
 });

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { createFoamGeometry, stackPieces } from './geometry.js';
+import { createFoamGeometry, stackRuns } from './geometry.js';
 import { cameraFor } from './camera.js';
 
-function createFoamMaterial(config, module, textures) {
-  const { length, thickness, width: depth } = module;
+function createFoamMaterial(config, run, textures) {
+  const { length, height: thickness, width: depth, seams } = run;
   const material = new THREE.MeshStandardMaterial({
     color: config.foamColor, map: textures.map ?? null, normalMap: textures.normalMap ?? null,
     normalScale: new THREE.Vector2(config.poreStrength, config.poreStrength), roughness: config.roughness, metalness: 0,
@@ -19,8 +19,26 @@ function createFoamMaterial(config, module, textures) {
       float upperFace=smoothstep(0.65,0.98,normalize(vFoamNormal).y);
       float edgeBand=1.0-smoothstep(0.0,1.8,edgeDistance);
       diffuseColor.rgb*=1.0-uEdgeShade*upperFace*edgeBand;`);
+    if (seams.length) {
+      shader.uniforms.uFoamSeams = { value: seams.map(seam => new THREE.Vector3(seam.first, seam.spacing, seam.count)) };
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\nuniform vec3 uFoamSeams[${seams.length}];`);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float seamDistance=1e10;
+        for(int i=0;i<${seams.length};i++){
+          vec3 seam=uFoamSeams[i];
+          float nearest=clamp(floor((vFoamPosition.y-seam.x)/seam.y+0.5),0.0,seam.z-1.0);
+          seamDistance=min(seamDistance,abs(vFoamPosition.y-(seam.x+nearest*seam.y)));
+        }
+        // Use the perpendicular screen-space gradient, so diagonal front/right
+        // edges get the same anti-aliasing width instead of Manhattan fwidth.
+        float pixelHeight=max(length(vec2(dFdx(vFoamPosition.y),dFdy(vFoamPosition.y))),1e-6);
+        float halfWidth=max(0.025/pixelHeight,0.55);
+        float seamCoverage=1.0-smoothstep(max(0.0,halfWidth-0.6),halfWidth+0.6,seamDistance/pixelHeight);
+        float sidewall=1.0-smoothstep(0.25,0.85,abs(normalize(vFoamNormal).y));
+        diffuseColor.rgb*=1.0-0.18*seamCoverage*sidewall;`);
+    }
   };
-  material.customProgramCacheKey = () => 'foam-soft-edge-v1';
+  material.customProgramCacheKey = () => `foam-contact-seams-v2-${seams.length}`;
   return material;
 }
 
@@ -29,14 +47,15 @@ export function createScene(config, textures, width, height) {
   scene.background = config.transparent ? null : new THREE.Color(config.background);
   const group = new THREE.Group();
   scene.add(group);
-  const resources = config.modules.map(module => ({
-    geometry: createFoamGeometry(module.length, module.thickness, module.width, config.radius, config.poreScale),
-    material: createFoamMaterial(config, module, textures),
+  const runs = stackRuns(config.modules);
+  const resources = runs.map(run => ({
+    geometry: createFoamGeometry(run.length, run.height, run.width, Math.min(config.radius, run.minThickness * 2), config.poreScale),
+    material: createFoamMaterial(config, run, textures),
   }));
-  for (const { moduleIndex, center } of stackPieces(config.modules)) {
-    const { geometry, material } = resources[moduleIndex];
+  for (const [index, run] of runs.entries()) {
+    const { geometry, material } = resources[index];
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.fromArray(center);
+    mesh.position.fromArray(run.center);
     mesh.castShadow = mesh.receiveShadow = true;
     group.add(mesh);
   }
