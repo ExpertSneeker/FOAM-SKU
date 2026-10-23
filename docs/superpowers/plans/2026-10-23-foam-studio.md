@@ -44,7 +44,7 @@ Files: `README.md`, `start-local.cmd`, `scripts/local-server.mjs`.
 
 - [x] Build static distribution and run locally at loopback port 4173.
 - [x] Document startup, parameter behavior, future static hosting, verified limits.
-- [ ] Self-review diff, run required checks, commit and push main; verify remote commit.
+- [x] Self-review diff, run required checks, commit and push main; verify remote commit.
 
 ## Execution notes
 
@@ -52,3 +52,4 @@ Files: `README.md`, `start-local.cmd`, `scripts/local-server.mjs`.
 - Native local git authentication works for fetch. GitHub connector confirms repository push permission.
 - Browser plugin absent; use Playwright with installed Edge for WebGL verification.
 - Image Gen is used only for UI concepting; no generated image is shipped as a product render or interactive UI.
+- Delivery: production service verified at `http://127.0.0.1:4173/`; feature commit `75e67c5` pushed to `origin/main` and confirmed with `git ls-remote`. Results and self-review are in `docs/verification.md`.
