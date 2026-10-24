@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DEFAULT_CONFIG } from '../config.js';
+import { DEFAULT_CONFIG, FOAM_COLOR_PRESETS } from '../config.js';
 import { ColorControl, RangeControl, Switch } from './Controls.jsx';
 import ModuleEditor from './ModuleEditor.jsx';
 
@@ -11,6 +11,11 @@ function ProductPanel({ config: c, change }) {
     <RangeControl label="细孔强度" value={c.poreStrength} onChange={poreStrength => change({ poreStrength })} min={0} max={2} />
     <RangeControl label="细孔大小" value={c.poreScale} onChange={poreScale => change({ poreScale })} min={0.3} max={3} unit="×" />
     <ColorControl label="表面颜色" value={c.foamColor} onChange={foamColor => change({ foamColor })} />
+    <div className="foam-color-presets" role="group" aria-label="海绵颜色预设">
+      {FOAM_COLOR_PRESETS.map(preset => <button type="button" key={preset.id} aria-pressed={c.foamColor === preset.color} onClick={() => change({ foamColor: preset.color })}>
+        <span className="foam-color-swatch" style={{ backgroundColor: preset.color }} aria-hidden="true" />{preset.label}
+      </button>)}
+    </div>
     <details className="advanced"><summary>更多材质设置</summary><RangeControl label="表面粗糙度" value={c.roughness} onChange={roughness => change({ roughness })} min={0.6} max={1} /><RangeControl label="上缘深浅" value={c.edgeShade} onChange={edgeShade => change({ edgeShade })} min={0} max={0.06} step={0.001} /></details>
   </>;
 }

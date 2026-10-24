@@ -26,6 +26,11 @@ export const PRESETS = [
   { id: 'medium', label: '72 × 30 × 2 in · 1 PC', length: 182.88, width: 76.2, thickness: 5.08, count: 1 },
 ];
 
+export const FOAM_COLOR_PRESETS = [
+  { id: 'white', label: '白色', color: '#ffffff' },
+  { id: 'yellow', label: '黄色', color: '#fff58c' },
+];
+
 export function normalizeConfig(input = {}) {
   const value = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
   const result = { ...DEFAULT_CONFIG };
