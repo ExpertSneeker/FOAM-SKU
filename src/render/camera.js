@@ -1,6 +1,6 @@
 import { MathUtils, PerspectiveCamera, Vector3 } from 'three';
 
-export function cameraFor(bounds, config, width, height) {
+export function cameraFor(bounds, config, width, height, fitPoints) {
   const aspect = width / height;
   const camera = new PerspectiveCamera(30, aspect, 0.05, 20000);
   camera.setFocalLength(config.focalLength);
@@ -14,11 +14,10 @@ export function cameraFor(bounds, config, width, height) {
   const inverse = camera.quaternion.clone().invert();
   const tanV = Math.tan(MathUtils.degToRad(camera.fov) / 2);
   const tanH = tanV * aspect;
-  const corners = [];
+  const corners = fitPoints ?? [];
+  if (!fitPoints) for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) corners.push(new Vector3(x, y, z));
   let distance = 0;
-  for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y]) for (const z of [bounds.min.z, bounds.max.z]) {
-    const point = new Vector3(x, y, z);
-    corners.push(point);
+  for (const point of corners) {
     const local = point.clone().sub(center).applyQuaternion(inverse);
     distance = Math.max(distance, local.z + Math.abs(local.x) / (tanH * config.framing), local.z + Math.abs(local.y) / (tanV * config.framing));
   }

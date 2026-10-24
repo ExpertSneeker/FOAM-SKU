@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { DEFAULT_CONFIG, FOAM_COLOR_PRESETS } from '../config.js';
 import { ColorControl, RangeControl, Switch } from './Controls.jsx';
 import ModuleEditor from './ModuleEditor.jsx';
+import SheetEditor from './SheetEditor.jsx';
 
 function ProductPanel({ config: c, change }) {
   return <>
-    <ModuleEditor modules={c.modules} change={change} />
+    <span className="field-label">海绵形态</span>
+    <div className="shape-picker" role="group" aria-label="海绵形态">{[['stack', '平板堆叠'], ['roll', '整卷'], ['partial', '半卷平铺']].map(([value, label]) => <button type="button" key={value} aria-pressed={c.shape === value} onClick={() => change({ shape: value })}>{label}</button>)}</div>
+    {c.shape === 'stack' ? <ModuleEditor modules={c.modules} change={change} /> : <SheetEditor config={c} change={change} />}
     <hr />
     <RangeControl label="圆角半径" value={c.radius} onChange={radius => change({ radius })} min={0} max={20} step={0.1} unit="mm" hint="薄片的圆角会自动限制在厚度允许的范围内。" />
     <RangeControl label="细孔强度" value={c.poreStrength} onChange={poreStrength => change({ poreStrength })} min={0} max={2} />

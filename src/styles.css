@@ -47,6 +47,15 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 25px 0; }
 .hint { color: var(--muted); font-size: 11px; line-height: 1.65; margin-top: 9px; }
 .align-right { text-align: right; }
 .stack-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.shape-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 26px; }
+.shape-picker button { padding: 0 5px; font-size: 12px; }
+.shape-picker button[aria-pressed=true], .roll-side button[aria-pressed=true], .roll-orientations button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); background: #eff6f2; }
+.sheet-editor .number-row > span { white-space: nowrap; }
+.sheet-editor .number-with-unit { width: 145px; flex-shrink: 0; gap: 8px; }
+.sheet-editor .number-with-unit input { width: 112px; }
+.roll-side, .roll-orientations { display: grid; gap: 7px; grid-template-columns: repeat(2, 1fr); }
+.roll-orientations { grid-template-columns: repeat(4, 1fr); margin-top: -9px; }
+.roll-side button, .roll-orientations button { padding: 0 5px; font-size: 12px; }
 .stack-heading > span { color: #788780; font-size: 11px; white-space: nowrap; }
 .stack-description { color: #7e8a84; font-size: 11px; line-height: 1.8; margin: 10px 0 17px; }
 .module-list { display: grid; gap: 14px; }

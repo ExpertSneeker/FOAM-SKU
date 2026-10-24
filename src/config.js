@@ -1,9 +1,14 @@
+import { getRollLimits } from './roll.js';
+
 export const STORAGE_KEY = 'foam-sku:config:v2';
 export const LEGACY_STORAGE_KEY = 'foam-sku:config:v1';
 export const MAX_MODULES = 12;
 export const DEFAULT_MODULE = Object.freeze({ id: 'module-1', unit: 'in', length: 60.96, width: 60.96, thickness: 10.16, count: 2 });
+export const DEFAULT_SHEET = Object.freeze({ unit: 'in', length: 254, width: 60.96, thickness: 2.54 });
+export const SHEET_LIMITS = Object.freeze({ length: [10, 1200], width: [1, 400], thickness: [0.2, 40] });
 export const DEFAULT_CONFIG = Object.freeze({
   version: 2, modules: Object.freeze([DEFAULT_MODULE]),
+  shape: 'stack', sheet: DEFAULT_SHEET, rollInnerDiameter: 10.16, rollTailLength: 45.72, rollSide: 'left', rollRotation: 0,
   radius: 0.7, foamColor: '#ffffff', poreScale: 0.66, poreStrength: 0, roughness: 0.98, edgeShade: 0.008,
   azimuth: 31, elevation: 11, focalLength: 65, framing: 0.84,
   background: '#ffffff', transparent: false, shadow: true, shadowOpacity: 0.11, shadowSoftness: 1.3,
@@ -16,6 +21,7 @@ export const LIMITS = Object.freeze({
   azimuth: [-180, 180], elevation: [5, 85], focalLength: [28, 120], framing: [0.35, 0.94],
   shadowOpacity: [0, 0.5], shadowSoftness: [0, 2.5], lighting: [0.5, 1.4], topLight: [0, 0.8],
   exportWidth: [256, 4096], exportHeight: [256, 4096],
+  rollRotation: [0, 360],
 });
 
 export const PRESETS = [
@@ -59,6 +65,19 @@ export function normalizeConfig(input = {}) {
     ids.add(id);
     return { ...module, id };
   });
+  result.shape = ['roll', 'partial'].includes(value.shape) ? value.shape : 'stack';
+  const sheet = value.sheet && typeof value.sheet === 'object' && !Array.isArray(value.sheet) ? value.sheet : {};
+  result.sheet = { ...DEFAULT_SHEET, unit: sheet.unit === 'cm' ? 'cm' : 'in' };
+  for (const [key, [min, max]] of Object.entries(SHEET_LIMITS)) {
+    if (typeof sheet[key] === 'number' && Number.isFinite(sheet[key])) result.sheet[key] = Math.max(min, Math.min(max, sheet[key]));
+  }
+  // A complete turn must remain possible even for the shortest, thickest input.
+  result.sheet.thickness = Math.min(result.sheet.thickness, result.sheet.length / 16);
+  const diameter = Number.isFinite(value.rollInnerDiameter) ? value.rollInnerDiameter : DEFAULT_CONFIG.rollInnerDiameter;
+  const limits = getRollLimits(result.sheet, diameter);
+  result.rollInnerDiameter = Math.max(limits.minDiameter, Math.min(limits.maxDiameter, diameter));
+  result.rollTailLength = Math.max(0, Math.min(limits.maxTail, Number.isFinite(value.rollTailLength) ? value.rollTailLength : DEFAULT_CONFIG.rollTailLength));
+  result.rollSide = value.rollSide === 'right' ? 'right' : 'left';
   if ([16, 32, 48, 64].includes(value.samples)) result.samples = value.samples;
   if (value.format === 'jpeg' && !result.transparent) result.format = 'jpeg';
   return result;
@@ -80,11 +99,17 @@ export const toCentimeters = (value, unit) => unit === 'in' ? value * 2.54 : val
 export const prettyNumber = value => Number(value.toFixed(3)).toString();
 export const moduleDimensions = module => [module.length, module.width, module.thickness].map(n => prettyNumber(toDisplay(n, module.unit))).join('x');
 export function exportFilename(config) {
+  const suffix = `${config.exportWidth}x${config.exportHeight}${config.transparent ? '_alpha' : ''}.${config.format === 'jpeg' ? 'jpg' : 'png'}`;
+  if (config.shape === 'roll' || config.shape === 'partial') {
+    const sheet = config.sheet;
+    const tail = config.shape === 'partial' ? `tail${prettyNumber(toDisplay(config.rollTailLength, sheet.unit))}${sheet.unit}_${config.rollSide}_` : '';
+    return `foam_${config.shape}_${moduleDimensions(sheet)}${sheet.unit}_1pc_${tail}${prettyNumber(config.rollRotation)}deg_${suffix}`;
+  }
   const modules = config.modules;
   const count = modules.reduce((sum, module) => sum + module.count, 0);
   const details = modules.map(module => `${moduleDimensions(module)}${module.unit}-${module.count}pcs`).join('_');
   const product = modules.length === 1 ? `${moduleDimensions(modules[0])}${modules[0].unit}` : `stack_${details.length <= 120 ? details : `${modules.length}modules`}`;
-  return `foam_${product}_${count}pcs_${config.exportWidth}x${config.exportHeight}${config.transparent ? '_alpha' : ''}.${config.format === 'jpeg' ? 'jpg' : 'png'}`;
+  return `foam_${product}_${count}pcs_${suffix}`;
 }
 
 export function loadSavedConfig(storage) {

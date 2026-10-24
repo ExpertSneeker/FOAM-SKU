@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createFoamGeometry, stackRuns } from './geometry.js';
 import { cameraFor } from './camera.js';
+import { createRolledFoamGeometry } from './rolledGeometry.js';
 
 function createFoamMaterial(config, run, textures) {
   const { length, height: thickness, width: depth, seams } = run;
@@ -47,19 +48,37 @@ export function createScene(config, textures, width, height) {
   scene.background = config.transparent ? null : new THREE.Color(config.background);
   const group = new THREE.Group();
   scene.add(group);
-  const runs = stackRuns(config.modules);
-  const resources = runs.map(run => ({
-    geometry: createFoamGeometry(run.length, run.height, run.width, Math.min(config.radius, run.minThickness * 2), config.poreScale),
-    material: createFoamMaterial(config, run, textures),
-  }));
-  for (const [index, run] of runs.entries()) {
-    const { geometry, material } = resources[index];
+  const resources = [];
+  const addFoam = (geometry, run, flip = 1) => {
+    const material = createFoamMaterial(config, run, textures);
+    resources.push({ geometry, material });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.fromArray(run.center);
+    mesh.scale.x = flip;
     mesh.castShadow = mesh.receiveShadow = true;
     group.add(mesh);
+  };
+  if (config.shape === 'roll' || config.shape === 'partial') {
+    const geometry = createRolledFoamGeometry(config);
+    const size = geometry.boundingBox.getSize(new THREE.Vector3());
+    addFoam(geometry, { length: size.x, height: size.y, width: size.z, center: [0, size.y / 2, 0], seams: [] }, config.rollSide === 'left' ? -1 : 1);
+    group.rotation.y = THREE.MathUtils.degToRad(config.rollRotation);
+  } else {
+    for (const run of stackRuns(config.modules)) {
+      addFoam(createFoamGeometry(run.length, run.height, run.width, Math.min(config.radius, run.minThickness * 2), config.poreScale), run);
+    }
   }
   const bounds = new THREE.Box3().setFromObject(group);
+  let fitPoints;
+  if (config.shape === 'roll' || config.shape === 'partial') {
+    // Keep the product's oriented box. Refitting its world-aligned box after
+    // rotation adds empty corners and makes oblique rolls unnecessarily small.
+    const mesh = group.children[0], box = mesh.geometry.boundingBox;
+    fitPoints = [];
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+      fitPoints.push(new THREE.Vector3(x, y, z).applyMatrix4(mesh.matrixWorld));
+    }
+  }
   const center = bounds.getCenter(new THREE.Vector3());
   const size = bounds.getSize(new THREE.Vector3());
   const extent = Math.max(size.x, size.y, size.z);
@@ -88,7 +107,7 @@ export function createScene(config, textures, width, height) {
   fill.target.position.copy(center);
   scene.add(fill, fill.target);
   return {
-    scene, key, extent, camera: cameraFor(bounds, config, width, height),
+    scene, key, extent, camera: cameraFor(bounds, config, width, height, fitPoints),
     dispose() {
       resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); });
       ground.geometry.dispose(); ground.material.dispose();
