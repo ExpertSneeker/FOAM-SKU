@@ -34,7 +34,7 @@ export const PRESETS = [
 
 export const FOAM_COLOR_PRESETS = [
   { id: 'white', label: '白色', color: '#ffffff' },
-  { id: 'yellow', label: '黄色', color: '#fff58c' },
+  { id: 'yellow', label: '黄色', color: '#fff480' },
 ];
 
 export function normalizeConfig(input = {}) {
