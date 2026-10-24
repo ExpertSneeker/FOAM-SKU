@@ -72,7 +72,7 @@ const Preview = forwardRef(function Preview({ config, change, busy, onReady, onE
   }
   function pointerMove(event) {
     if (!drag.current || busy) return;
-    change({ azimuth: drag.current.azimuth + (event.clientX - drag.current.x) * 0.3, elevation: drag.current.elevation + (event.clientY - drag.current.y) * 0.25 });
+    change({ azimuth: drag.current.azimuth - (event.clientX - drag.current.x) * 0.3, elevation: drag.current.elevation + (event.clientY - drag.current.y) * 0.25 });
   }
   function keyboard(event) {
     if (busy) return;
