@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createFoamTextures } from './textures.js';
-import { createScene } from './scene.js';
+import { SceneCache } from './sceneCache.js';
 
 const vertexShader = 'varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
 const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
@@ -19,7 +19,33 @@ export class StudioRenderer {
     this.handleLost = event => { event.preventDefault(); this.lost = true; onContextLost?.(); };
     this.renderer.domElement.addEventListener('webglcontextlost', this.handleLost);
     this.textures = createFoamTextures(this.renderer.capabilities.getMaxAnisotropy());
+    this.scenes = new SceneCache(this.textures);
+    this.interactiveBundle = null;
     this.generation = 0;
+  }
+
+  resize(width, height) {
+    if (this.renderer.domElement.width !== width || this.renderer.domElement.height !== height) this.renderer.setSize(width, height, false);
+  }
+
+  renderInteractive(config, canvas, width, height) {
+    ++this.generation;
+    if (this.lost) throw new Error('显卡渲染上下文已丢失，请刷新页面后降低导出分辨率。');
+    const renderer = this.renderer;
+    const bundle = this.scenes.get(config, width, height);
+    bundle.key.position.copy(bundle.keyPosition);
+    // Orbiting the camera does not move the product or light: reuse its shadow.
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = this.interactiveBundle !== bundle;
+    this.interactiveBundle = bundle;
+    this.resize(width, height);
+    renderer.setRenderTarget(null);
+    renderer.autoClear = true;
+    renderer.render(bundle.scene, bundle.camera);
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    const context = canvas.getContext('2d');
+    context.clearRect(0, 0, width, height);
+    context.drawImage(renderer.domElement, 0, 0);
   }
 
   async render(config, canvas, width, height, samples, { signal, onProgress } = {}) {
@@ -31,8 +57,10 @@ export class StudioRenderer {
     check();
     const renderer = this.renderer;
     if (Math.max(width, height) > renderer.capabilities.maxTextureSize) throw new Error('分辨率超过当前显卡限制，请降低导出尺寸。');
-    renderer.setSize(width, height, false);
-    const bundle = createScene(config, this.textures, width, height);
+    this.resize(width, height);
+    const bundle = this.scenes.get(config, width, height);
+    this.interactiveBundle = null;
+    renderer.shadowMap.autoUpdate = true;
     // Render linear premultiplied RGBA, then average on the GPU. A floating
     // target avoids Canvas2D's per-sample 8-bit rounding and alpha dark fringes.
     const sample = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: Math.min(4, renderer.capabilities.maxSamples), depthBuffer: true });
@@ -59,7 +87,7 @@ export class StudioRenderer {
     const quad = new THREE.Mesh(quadGeometry, average);
     const pass = new THREE.Scene(); pass.add(quad);
     const camera = new THREE.Camera();
-    const base = bundle.key.position.clone();
+    const base = bundle.keyPosition;
     const context = canvas.getContext('2d');
     try {
       renderer.setRenderTarget(accumulation); renderer.clear();
@@ -88,13 +116,16 @@ export class StudioRenderer {
       return canvas;
     } finally {
       renderer.setRenderTarget(null); renderer.autoClear = true;
-      sample.dispose(); accumulation.dispose(); average.dispose(); output.dispose(); quadGeometry.dispose(); bundle.dispose();
+      sample.dispose(); accumulation.dispose(); average.dispose(); output.dispose(); quadGeometry.dispose();
+      // A newer render may already be sampling this same cached scene.
+      if (generation === this.generation) bundle.key.position.copy(base);
     }
   }
 
   dispose() {
     ++this.generation;
     this.renderer.domElement.removeEventListener('webglcontextlost', this.handleLost);
+    this.scenes.dispose();
     this.textures.map.dispose(); this.textures.normalMap.dispose(); this.renderer.dispose(); this.renderer.forceContextLoss();
   }
 }

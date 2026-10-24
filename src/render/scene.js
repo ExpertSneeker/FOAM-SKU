@@ -107,7 +107,10 @@ export function createScene(config, textures, width, height) {
   fill.target.position.copy(center);
   scene.add(fill, fill.target);
   return {
-    scene, key, extent, camera: cameraFor(bounds, config, width, height, fitPoints),
+    scene, key, extent, keyPosition: key.position.clone(), camera: cameraFor(bounds, config, width, height, fitPoints),
+    updateCamera(nextConfig, nextWidth, nextHeight) {
+      this.camera = cameraFor(bounds, nextConfig, nextWidth, nextHeight, fitPoints);
+    },
     dispose() {
       resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); });
       ground.geometry.dispose(); ground.material.dispose();
