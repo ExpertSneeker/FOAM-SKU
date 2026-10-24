@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { createFoamGeometry, stackRuns } from './geometry.js';
+import { createFoamGeometry, stackPieces } from './geometry.js';
 import { cameraFor } from './camera.js';
 import { createRolledFoamGeometry } from './rolledGeometry.js';
 
-function createFoamMaterial(config, run, textures) {
-  const { length, height: thickness, width: depth, seams } = run;
+function createFoamMaterial(config, dimensions, textures) {
+  const { length, height: thickness, width: depth } = dimensions;
   const material = new THREE.MeshStandardMaterial({
     color: config.foamColor, map: textures.map ?? null, normalMap: textures.normalMap ?? null,
     normalScale: new THREE.Vector2(config.poreStrength, config.poreStrength), roughness: config.roughness, metalness: 0,
@@ -20,26 +20,8 @@ function createFoamMaterial(config, run, textures) {
       float upperFace=smoothstep(0.65,0.98,normalize(vFoamNormal).y);
       float edgeBand=1.0-smoothstep(0.0,1.8,edgeDistance);
       diffuseColor.rgb*=1.0-uEdgeShade*upperFace*edgeBand;`);
-    if (seams.length) {
-      shader.uniforms.uFoamSeams = { value: seams.map(seam => new THREE.Vector3(seam.first, seam.spacing, seam.count)) };
-      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\nuniform vec3 uFoamSeams[${seams.length}];`);
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-        float seamDistance=1e10;
-        for(int i=0;i<${seams.length};i++){
-          vec3 seam=uFoamSeams[i];
-          float nearest=clamp(floor((vFoamPosition.y-seam.x)/seam.y+0.5),0.0,seam.z-1.0);
-          seamDistance=min(seamDistance,abs(vFoamPosition.y-(seam.x+nearest*seam.y)));
-        }
-        // Use the perpendicular screen-space gradient, so diagonal front/right
-        // edges get the same anti-aliasing width instead of Manhattan fwidth.
-        float pixelHeight=max(length(vec2(dFdx(vFoamPosition.y),dFdy(vFoamPosition.y))),1e-6);
-        float halfWidth=max(0.025/pixelHeight,0.55);
-        float seamCoverage=1.0-smoothstep(max(0.0,halfWidth-0.6),halfWidth+0.6,seamDistance/pixelHeight);
-        float sidewall=1.0-smoothstep(0.25,0.85,abs(normalize(vFoamNormal).y));
-        diffuseColor.rgb*=1.0-0.18*seamCoverage*sidewall;`);
-    }
   };
-  material.customProgramCacheKey = () => `foam-contact-seams-v2-${seams.length}`;
+  material.customProgramCacheKey = () => 'foam-rounded-piece-v1';
   return material;
 }
 
@@ -48,29 +30,32 @@ export function createScene(config, textures, width, height) {
   scene.background = config.transparent ? null : new THREE.Color(config.background);
   const group = new THREE.Group();
   scene.add(group);
-  const resources = [];
-  const addFoam = (geometry, run, flip = 1) => {
-    const material = createFoamMaterial(config, run, textures);
-    resources.push({ geometry, material });
+  const resources = new Map();
+  const addFoam = (key, makeGeometry, dimensions, flip = 1) => {
+    if (!resources.has(key)) resources.set(key, { geometry: makeGeometry(), material: createFoamMaterial(config, dimensions, textures) });
+    const { geometry, material } = resources.get(key);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.fromArray(run.center);
+    mesh.position.fromArray(dimensions.center);
     mesh.scale.x = flip;
     mesh.castShadow = mesh.receiveShadow = true;
     group.add(mesh);
   };
-  if (config.shape === 'roll' || config.shape === 'partial') {
+  if (config.shape === 'partial') {
     const geometry = createRolledFoamGeometry(config);
     const size = geometry.boundingBox.getSize(new THREE.Vector3());
-    addFoam(geometry, { length: size.x, height: size.y, width: size.z, center: [0, size.y / 2, 0], seams: [] }, config.rollSide === 'left' ? -1 : 1);
+    addFoam('sheet', () => geometry, { length: size.x, height: size.y, width: size.z, center: [0, size.y / 2, 0] }, config.rollSide === 'left' ? -1 : 1);
     group.rotation.y = THREE.MathUtils.degToRad(config.rollRotation);
   } else {
-    for (const run of stackRuns(config.modules)) {
-      addFoam(createFoamGeometry(run.length, run.height, run.width, Math.min(config.radius, run.minThickness * 2), config.poreScale), run);
+    for (const piece of stackPieces(config.modules, config.stackAlignment)) {
+      const { length, width, thickness } = config.modules[piece.moduleIndex];
+      // Every sheet keeps its own rounded top and bottom, even at touching rims.
+      // Identical dimensions can share resources without merging their shapes.
+      addFoam(`${length},${thickness},${width}`, () => createFoamGeometry(length, thickness, width, config.radius, config.poreScale), { length, height: thickness, width, center: piece.center });
     }
   }
   const bounds = new THREE.Box3().setFromObject(group);
   let fitPoints;
-  if (config.shape === 'roll' || config.shape === 'partial') {
+  if (config.shape === 'partial') {
     // Keep the product's oriented box. Refitting its world-aligned box after
     // rotation adds empty corners and makes oblique rolls unnecessarily small.
     const mesh = group.children[0], box = mesh.geometry.boundingBox;

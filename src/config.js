@@ -6,12 +6,23 @@ export const MAX_MODULES = 12;
 export const DEFAULT_MODULE = Object.freeze({ id: 'module-1', unit: 'in', length: 60.96, width: 60.96, thickness: 10.16, count: 2 });
 export const DEFAULT_SHEET = Object.freeze({ unit: 'in', length: 254, width: 60.96, thickness: 2.54 });
 export const SHEET_LIMITS = Object.freeze({ length: [10, 1200], width: [1, 400], thickness: [0.2, 40] });
+export const STACK_ALIGNMENTS = [
+  { id: 'back-left', label: '左后', x: -1, z: -1 },
+  { id: 'back-center', label: '后侧', x: 0, z: -1 },
+  { id: 'back-right', label: '右后', x: 1, z: -1 },
+  { id: 'center-left', label: '左侧', x: -1, z: 0 },
+  { id: 'center', label: '居中', x: 0, z: 0 },
+  { id: 'center-right', label: '右侧', x: 1, z: 0 },
+  { id: 'front-left', label: '左前', x: -1, z: 1 },
+  { id: 'front-center', label: '前侧', x: 0, z: 1 },
+  { id: 'front-right', label: '右前', x: 1, z: 1 },
+];
 export const DEFAULT_CONFIG = Object.freeze({
-  version: 2, modules: Object.freeze([DEFAULT_MODULE]),
+  version: 2, modules: Object.freeze([DEFAULT_MODULE]), stackAlignment: 'center',
   shape: 'stack', sheet: DEFAULT_SHEET, rollInnerDiameter: 10.16, rollTailLength: 45.72, rollSide: 'left', rollRotation: 0,
-  radius: 0.7, foamColor: '#ffffff', poreScale: 0.66, poreStrength: 0, roughness: 0.98, edgeShade: 0.008,
+  radius: 0.7, foamColor: '#ffffff', poreScale: 0.3, poreStrength: 0, roughness: 0.98, edgeShade: 0.008,
   azimuth: 31, elevation: 11, focalLength: 65, framing: 0.84,
-  background: '#ffffff', transparent: false, shadow: true, shadowOpacity: 0.11, shadowSoftness: 1.3,
+  background: '#ffffff', transparent: true, shadow: true, shadowOpacity: 0.11, shadowSoftness: 1.3,
   lighting: 1.02, topLight: 0.32, exportWidth: 2000, exportHeight: 2000, samples: 64, format: 'png',
 });
 
@@ -65,7 +76,8 @@ export function normalizeConfig(input = {}) {
     ids.add(id);
     return { ...module, id };
   });
-  result.shape = ['roll', 'partial'].includes(value.shape) ? value.shape : 'stack';
+  if (STACK_ALIGNMENTS.some(alignment => alignment.id === value.stackAlignment)) result.stackAlignment = value.stackAlignment;
+  result.shape = ['roll', 'partial'].includes(value.shape) ? 'partial' : 'stack';
   const sheet = value.sheet && typeof value.sheet === 'object' && !Array.isArray(value.sheet) ? value.sheet : {};
   result.sheet = { ...DEFAULT_SHEET, unit: sheet.unit === 'cm' ? 'cm' : 'in' };
   for (const [key, [min, max]] of Object.entries(SHEET_LIMITS)) {
@@ -77,6 +89,8 @@ export function normalizeConfig(input = {}) {
   const limits = getRollLimits(result.sheet, diameter);
   result.rollInnerDiameter = Math.max(limits.minDiameter, Math.min(limits.maxDiameter, diameter));
   result.rollTailLength = Math.max(0, Math.min(limits.maxTail, Number.isFinite(value.rollTailLength) ? value.rollTailLength : DEFAULT_CONFIG.rollTailLength));
+  // The removed whole-roll mode is a partial sheet with no flat extension.
+  if (value.shape === 'roll') result.rollTailLength = 0;
   result.rollSide = value.rollSide === 'right' ? 'right' : 'left';
   if ([16, 32, 48, 64].includes(value.samples)) result.samples = value.samples;
   if (value.format === 'jpeg' && !result.transparent) result.format = 'jpeg';
@@ -100,9 +114,9 @@ export const prettyNumber = value => Number(value.toFixed(3)).toString();
 export const moduleDimensions = module => [module.length, module.width, module.thickness].map(n => prettyNumber(toDisplay(n, module.unit))).join('x');
 export function exportFilename(config) {
   const suffix = `${config.exportWidth}x${config.exportHeight}${config.transparent ? '_alpha' : ''}.${config.format === 'jpeg' ? 'jpg' : 'png'}`;
-  if (config.shape === 'roll' || config.shape === 'partial') {
+  if (config.shape === 'partial') {
     const sheet = config.sheet;
-    const tail = config.shape === 'partial' ? `tail${prettyNumber(toDisplay(config.rollTailLength, sheet.unit))}${sheet.unit}_${config.rollSide}_` : '';
+    const tail = `tail${prettyNumber(toDisplay(config.rollTailLength, sheet.unit))}${sheet.unit}_${config.rollSide}_`;
     return `foam_${config.shape}_${moduleDimensions(sheet)}${sheet.unit}_1pc_${tail}${prettyNumber(config.rollRotation)}deg_${suffix}`;
   }
   const modules = config.modules;

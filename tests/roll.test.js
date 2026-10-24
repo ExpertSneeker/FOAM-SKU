@@ -22,15 +22,15 @@ test('roll settings round trip while retaining the original independent stack', 
   assert.equal(normalizeConfig().shape, 'stack');
 });
 
-test('roll-only export names identify single sheets, form, tail and orientation', () => {
+test('partial-sheet export names identify single sheets, tail and orientation', () => {
   const c = normalizeConfig({ shape: 'partial', sheet, rollTailLength: 40, rollSide: 'left', rollRotation: 90 });
   assert.match(exportFilename(c), /^foam_partial_254x60\.96x2\.54cm_1pc_tail40cm_left_90deg_/);
-  assert.match(exportFilename(normalizeConfig({ ...c, shape: 'roll' })), /^foam_roll_254x60\.96x2\.54cm_1pc_90deg_/);
+  assert.match(exportFilename(normalizeConfig({ ...c, shape: 'roll' })), /^foam_partial_254x60\.96x2\.54cm_1pc_tail0cm_left_90deg_/);
 });
 
 test('rolled forms render one grounded mesh and reuse the existing foam material', () => {
   const textures = { map: new Texture(), normalMap: new Texture() };
-  for (const shape of ['roll', 'partial']) {
+  for (const shape of ['partial']) {
     const c = normalizeConfig({ shape, sheet, rollTailLength: 45.72, ...materialSettings, modules: [{ count: 8 }, { count: 3, length: 40 }] });
     const bundle = createScene(c, textures, 1200, 900);
     const group = bundle.scene.children.find(child => child.isGroup);
@@ -106,7 +106,7 @@ test('left/right mirrored rolls and quarter-turn orientations stay on the ground
 });
 
 test('oblique roll orientations retain useful framing around the actual product', () => {
-  const c = normalizeConfig({ shape: 'roll', rollRotation: 60 });
+  const c = normalizeConfig({ shape: 'partial', rollTailLength: 0, rollRotation: 60 });
   const bundle = createScene(c, {}, 2000, 2000);
   const mesh = bundle.scene.children.find(child => child.isGroup).children[0];
   const positions = mesh.geometry.attributes.position;

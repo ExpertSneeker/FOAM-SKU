@@ -44,8 +44,7 @@ function sweepSections(points, radius) {
 // physical arc length; changing turns or width does not stretch the pore texture.
 export function createRolledFoamGeometry(config) {
   const { sheet } = config;
-  const tail = config.shape === 'partial' ? config.rollTailLength : 0;
-  const path = sampleRollPath(sheet, config.rollInnerDiameter, tail);
+  const path = sampleRollPath(sheet, config.rollInnerDiameter, config.rollTailLength);
   const radius = Math.min(config.radius / 10, sheet.thickness * 0.2, sheet.width * 0.05);
   const ring = roundedSection(sheet.thickness, sheet.width, radius);
   const sections = sweepSections(path.points, radius);

@@ -7,7 +7,7 @@ import { createFrameScheduler } from '../src/render/frameScheduler.js';
 
 test('camera drags and export resolution reuse the model while updating the fitted camera', () => {
   const cache = new SceneCache({});
-  for (const shape of ['stack', 'roll', 'partial']) {
+  for (const shape of ['stack', 'partial']) {
     const config = normalizeConfig({ shape, rollRotation: 60 });
     const first = cache.get(config, 900, 900);
     const mesh = first.scene.children.find(child => child.isGroup).children[0];
